@@ -1,33 +1,41 @@
 import requests
 from bs4 import BeautifulSoup
 
-BASE_URL = "https://www.antarvasna3.com/videos/tags/hindi-porn-mms/"
-
 def scrape_videos():
+    base_url = "https://www.antarvasna3.com/videos/tags/hindi-porn-mms/"
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
-    response = requests.get(BASE_URL, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
 
-    videos = []
-    for video_div in soup.select("div.video-block"):
-        a_tag = video_div.find("a")
-        title = a_tag.get("title")
-        video_page = a_tag.get("href")
-        thumb = video_div.find("img").get("data-src")
+    res = requests.get(base_url, headers=headers)
+    soup = BeautifulSoup(res.text, "html.parser")
 
-        # Get full video URL
-        video_resp = requests.get(video_page, headers=headers)
-        vsoup = BeautifulSoup(video_resp.text, "html.parser")
-        source = vsoup.find("source")
-        video_url = source.get("src") if source else ""
+    data = []
 
-        if title and video_url:
-            videos.append({
-                "title": title.strip(),
-                "video_url": video_url,
-                "watch_link": video_url,
-                "thumbnail": thumb
-            })
-    return videos
+    for vid in soup.select(".videotitle"):
+        title = vid.get_text(strip=True)
+        href = vid.find("a")["href"]
+        full_url = "https://www.antarvasna3.com" + href
+
+        # open each video page
+        vres = requests.get(full_url, headers=headers)
+        vsoup = BeautifulSoup(vres.text, "html.parser")
+
+        iframe = vsoup.find("iframe")
+        if not iframe:
+            continue
+
+        watch_url = iframe["src"]
+        if "embed-" in watch_url:
+            # try to build direct .mp4 url (depends on site logic)
+            mp4_url = watch_url.replace("embed-", "").replace(".html", ".mp4")
+        else:
+            mp4_url = watch_url
+
+        data.append({
+            "title": title,
+            "video_url": mp4_url,
+            "watch_online": watch_url
+        })
+
+    return data
